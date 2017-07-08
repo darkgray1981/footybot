@@ -14,6 +14,7 @@ import (
 
 	"github.com/thoj/go-ircevent"
 	"golang.org/x/net/html"
+	"github.com/Jeffail/gabs"
 )
 
 // Google API key/CX for google searches
@@ -21,56 +22,35 @@ const GOOGLE_API_KEY = "paste key here"
 const GOOGLE_CX = "paste cx here"
 
 // IRC config
-const IRC_NICK = "footybot"
+const IRC_NICK = "footybot-JB"
 const IRC_USER = "botness"
 const IRC_SERVER = "irc.synirc.net:6667"
-const IRC_CHANNEL = "#epl"
+const IRC_CHANNEL = "#epl-test"
 
 // Main program loop
 func main() {
 	runBot()
 }
 
-// URLs for league tables
-var tables = map[string]string{
-	"ES":   "http://www.bbc.com/sport/football/tables/partial/119001074",
-	"IT":   "http://www.bbc.com/sport/football/tables/partial/119001017",
-	"EN":   "http://www.bbc.com/sport/football/tables/partial/118996114",
-	"AU":   "http://www.bbc.com/sport/football/tables/partial/999999995",
-	"NL":   "http://www.bbc.com/sport/football/tables/partial/119001012",
-	"FR":   "http://www.bbc.com/sport/football/tables/partial/119000981",
-	"DE":   "http://www.bbc.com/sport/football/tables/partial/119000986",
-	"PT":   "http://www.bbc.com/sport/football/tables/partial/119001048",
-	"US":   "http://www.bbc.com/sport/football/tables/partial/999999988",
-	"DK":   "http://www.bbc.com/sport/football/tables/partial/119000950",
-	"SE":   "http://www.bbc.com/sport/football/tables/partial/119001079",
-	"NO":   "http://www.bbc.com/sport/football/tables/partial/119001043",
-	"IE":   "http://www.bbc.com/sport/football/tables/partial/118996240",
-	"SCOT": "http://www.bbc.com/sport/football/tables/partial/118996176",
+// Note - possibly rate limited
+const BASE_BBC_URL = "http://push.api.bbci.co.uk/p?c=1&t=";
 
-	"CS": "http://www.bbc.com/sport/football/tables/partial/118996115",
-	"L1": "http://www.bbc.co.uk/sport/football/tables/partial/118996116",
-	"L2": "http://www.bbc.co.uk/sport/football/tables/partial/118996117",
-}
+// One %s param - team name
+const BASE_TEAM_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-tabbed-teams-model/isApp/false/limit/4/team/%s/version/1.0.6"
 
-// URLs for league fixtures
-var fixtures = map[string]string{
-	"UK": "http://www.bbc.co.uk/sport/football/fixtures",
-	"CL": "http://www.bbc.co.uk/sport/football/champions-league/fixtures",
-	"EL": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-118999989",
-	"ES": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119001074",
-	"IT": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119001017",
-	"US": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-999999988",
-	"DE": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119000986",
-	"NL": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119001012",
-	"FR": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119000981",
-	"AU": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-999999995",
+// One %s param - tournament
+const BASE_LEAGUE_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-tabbed-model/isApp/false/limit/12/tournament/%s/version/2.0.0"
 
-	"EC": "http://www.bbc.co.uk/sport/football/fixtures/partial/competition-119002035",
-}
+// Three %s params - endDate, startDate, tournament
+const BASE_FIXTURES_URL = "morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/%s/version/2.2.1/withPlayerActions/false"
 
-// Aliases for mapping shorter club names
-var aliases = map[string]string{
+// Two %s params - endDate startDate
+const BASE_ALL_FIXTURES_URL = "morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/full-priority-order/version/2.2.1/withPlayerActions/false"
+
+// One %s param = competition
+const BASE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.4.1"
+
+var aliases = map[string]string {
 	"city":          "manchester city",
 	"united":        "manchester united",
 	"wolves":        "wolverhampton wanderers",
@@ -94,10 +74,10 @@ var aliases = map[string]string{
 	"leeds":         "leeds united",
 	"ipswich":       "ipswich town",
 	"boro":          "middlesbrough",
-	"hull":			 "hull city",
+	"hull":          "hull city",
 
 	"bournemouth":   "afc bournemouth",
-	"preston":		 "preston north end",
+	"preston":       "preston north end",
 
 	"farcenal":       "arsenal",
 	"farsenal":       "arsenal",
@@ -115,6 +95,73 @@ var aliases = map[string]string{
 	"brizzle":        "bristol city",
 
 	"psg": "paris st germain",
+	"juve": "juventus",
+	"barca": "barcelona",
+	"real": "real-madrid",
+}
+
+// URLs for tournaments
+var tournaments = map[string]string{
+	"AFCON":    "africa-cup-of-nations",
+	"ARG":      "argentine-primera-division",
+	"AUS":      "australian-a-league",
+	"AUT":      "austrian-bundesliga",
+	"BEL":      "belgian-pro-league",
+	"BRA":      "brazilian-league",
+	"CL":       "champions-league",
+	"CS":       "championship",
+	"CC":       "confederations-cup",
+	"COPA":     "copa-america",
+	"DK":       "danish-superliga",
+	"NL":       "dutch-eredivisie",
+	"EFLT":     "football-league-trophy",
+	"EC":       "european-championship",
+	"EU21Q":    "euro-under-21-qualifying",
+	"EU21":     "euro-under-21-championship",
+	"EL":       "europa-league",
+	"ECQ":      "european-championship-qualifying",
+	"FIN":      "finnish-veikkausliiga",
+	"FR":       "french-ligue-one",
+	"DE":       "german-bundesliga",
+	"GOLD":     "gold-cup",
+	"GRC":      "greek-superleague",
+	"HIGH":     "highland-league",
+	"LOI":      "league-of-ireland-premier",
+	"IP":       "irish-premiership",
+	"L1":       "league-one",
+	"L2":       "league-two",
+	"LOW":      "lowland-league",
+	"MOLY":     "olympic-football-men",
+	"CONF":     "national-league",
+	"CONFN":    "national-league-north",
+	"CONFS":    "national-league-south",
+	"NO":       "norwegian-tippeligaen",
+	"PT":       "portuguese-primeira-liga",
+	"PL":       "premier-league",
+	"EN":       "premier-league",
+	"RPL":      "russian-premier-league",
+	"SCLC":     "scottish-league-cup",
+	"SL1":      "scottish-league-one",
+	"SL2":      "scottish-league-two",
+	"SPL":      "scottish-premiership",
+	"SHE":      "shebelieves-cup",
+	"ES":       "spanish-la-liga",
+	"SE":       "swedish-allsvenskan",
+	"SW":       "swiss-super-league",
+	"TK":       "turkish-super-lig",
+	"US":       "us-major-league",
+	"WPL":      "welsh-premier-league",
+	"WEC":      "womens-european-championship",
+	"WECQ":     "womens-european-championship-qualifying",
+	"WOLY":     "olympic-football-women",
+	"WPN":      "womens-premier-league-north",
+	"WPS":      "womens-premier-league-south",
+	"WSL1":     "womens-super-league",
+	"WSL2":     "womens-super-league-two",
+	"WWCQ":     "womens-world-cup-qualifying-european",
+	"WWC":      "womens-world-cup",
+	"WC":       "world-cup",
+	"WCQE":     "world-cup-qualifying-european",
 }
 
 // Check if an alias is registered, else strip and return
@@ -260,9 +307,22 @@ func Currency(query string) string {
 
 // Return latest results for a club
 func LatestResults(team string) string {
-	team = checkAlias(team)
+	var isTournament = false
+	if tournament, ok := tournaments[strings.ToUpper(team)]; ok {
+		team = tournament
+		isTournament = true
+	} else {
+		team = checkAlias(team)
+	}
 
-	resp, err := http.Get("http://www.bbc.co.uk/sport/football/teams/" + team + "/results")
+	var site = ""
+	if (isTournament) {
+		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
+	} else {
+		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
+	}
+
+	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
@@ -273,70 +333,77 @@ func LatestResults(team string) string {
 		return "Error - Club not found."
 	}
 
-	// Run HTML parser to get DOM
-	root, err := html.Parse(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 
-	// Helper function to return all text nodes in a subtree
-	var pr func(*html.Node) []string
-	pr = func(n *html.Node) []string {
-		var result []string
+	jsonParsed, err := gabs.ParseJSON(body)
+	if err != nil {
+		return "Error - " + err.Error()
+	}
 
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.TextNode {
-				trimmed := strings.TrimSpace(c.Data)
-				if len(trimmed) > 0 {
-					result = append(result, trimmed)
-				}
+	payload := jsonParsed.S("moments").Index(0).Path("payload").Data()
+	if (payload == nil) {
+		return "No results found"
+	}
+
+	jsonParsed, err = gabs.ParseJSON([]byte(payload.(string)))
+	if err != nil {
+		return "Error - " + err.Error()
+	}
+
+	var results *gabs.Container
+	var toShow = 3
+	if isTournament {
+		results = jsonParsed.Path("results.tournament.stages")
+		results = results.Index(0).Path("rounds")
+		results = results.Index(0).Path("events")
+		toShow = 10
+	} else {
+		results = jsonParsed.Path("results.body.rounds")
+	}
+
+	if results.Data() == nil {
+		return "Error - no results for " + team
+	}
+
+	resultsArr := make([]string, 0)
+
+	for i := 0; i < toShow; i++ {
+		var compName = ""
+		var eventsNode *gabs.Container
+		if isTournament {
+			eventsNode = results.Index(i)
+
+			if eventsNode.Data() == nil {
+				break
 			}
-			result = append(result, pr(c)...)
+		} else {
+			compName = " (" + results.Index(i).Path("name.first").Data().(string) + ")"
+			eventsNode = results.Index(i).Path("events").Index(0)
 		}
+		var homeTeam = eventsNode.Path("homeTeam.name.first").Data().(string)
+		var homeGoals = int(eventsNode.Path("homeTeam.scores.fullTime").Data().(float64))
+		var homeGoalsEt = eventsNode.Path("homeTeam.scores.extraTime").Data()
+		var awayTeam = eventsNode.Path("awayTeam.name.first").Data().(string)
+		var awayGoals = int(eventsNode.Path("awayTeam.scores.fullTime").Data().(float64))
+		var awayGoalsEt = eventsNode.Path("awayTeam.scores.extraTime").Data()
 
-		return result
-	}
-
-	var output []string
-
-	// Helper function to look through DOM for elements of interest
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "td" {
-			for _, a := range n.Attr {
-				if a.Key == "class" && a.Val == "match-details teams" {
-					match := pr(n)
-					if len(match) < 3 {
-						break
-					}
-
-					// Add bold tags to club names
-					match[0] = "\x02" + match[0] + "\x02"
-					match[2] = "\x02" + match[2] + "\x02"
-
-					output = append(output, strings.Join(match, " "))
-					break
-				}
+		if homeGoalsEt != nil && awayGoalsEt != nil {
+			var homeGoalsShootout = eventsNode.Path("homeTeam.scores.shootout").Data()
+			var awayGoalsShootout = eventsNode.Path("awayTeam.scores.shootout").Data()
+			if homeGoalsShootout != nil && awayGoalsShootout != nil {
+				resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET (Pens %d-%d)%s", homeTeam, int(homeGoalsEt.(float64)), int(awayGoalsEt.(float64)), awayTeam, int(homeGoalsShootout.(float64)), int(awayGoalsShootout.(float64)), compName))
+			} else {
+				resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET%s", homeTeam, int(homeGoalsEt.(float64)), int(awayGoalsEt.(float64)), awayTeam, compName))
 			}
+		} else {
+			resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02%s", homeTeam, homeGoals, awayGoals, awayTeam, compName))
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(root)
-
-	// Grab at most three matches
-	end := 3
-	if len(output) < end {
-		end = len(output)
 	}
 
-	if end == 0 {
-		fmt.Println("Results not found: " + team)
-		return "Error - No results found."
-	}
-
-	return strings.Join(output[:end], " | ")
+	return strings.Join(resultsArr[:], ", ")
 }
 
 // Return current league table position for a club
@@ -429,9 +496,22 @@ func TablePosition(team string) string {
 
 // Get next matches on a club's schedule
 func NextMatch(team string) string {
-	team = checkAlias(team)
+	var isTournament = false
+	if tournament, ok := tournaments[strings.ToUpper(team)]; ok {
+		team = tournament
+		isTournament = true
+	} else {
+		team = checkAlias(team)
+	}
 
-	resp, err := http.Get("http://www.bbc.co.uk/sport/football/teams/" + team + "/fixtures")
+	var site = ""
+	if (isTournament) {
+		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
+	} else {
+		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
+	}
+
+	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
@@ -442,87 +522,75 @@ func NextMatch(team string) string {
 		return "Error - Club not found."
 	}
 
-	// Run HTML parser to get DOM
-	root, err := html.Parse(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 
-	// Helper function to return all text nodes in a subtree
-	var pr func(*html.Node) []string
-	pr = func(n *html.Node) []string {
-		var result []string
+	jsonParsed, err := gabs.ParseJSON(body)
+	if err != nil {
+		return "Error - " + err.Error()
+	}
 
-	OUTER:
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			// Skip preview field nodes
-			if c.Type == html.ElementNode && c.Data == "td" {
-				for _, a := range c.Attr {
-					if a.Key == "class" && a.Val == "status" {
-						continue OUTER
-					}
-				}
-			}
+	payload := jsonParsed.S("moments").Index(0).Path("payload").Data()
+	if (payload == nil) {
+		return "No fixtures found"
+	}
 
-			// Add text fields
-			if c.Type == html.TextNode {
-				trimmed := strings.TrimSpace(c.Data)
-				if len(trimmed) > 0 {
-					result = append(result, trimmed)
-				}
-			}
-			result = append(result, pr(c)...)
+	jsonParsed, err = gabs.ParseJSON([]byte(payload.(string)))
+	if err != nil {
+		return "Error - " + err.Error()
+	}
+
+	var fixtures *gabs.Container
+	var toShow = 3
+	if isTournament {
+		fixtures = jsonParsed.Path("fixtures.tournament.stages")
+		fixtures = fixtures.Index(0).Path("rounds")
+		fixtures = fixtures.Index(0).Path("events")
+		toShow = 10
+	} else {
+		fixtures = jsonParsed.Path("fixtures.body.rounds")
+	}
+
+	if fixtures.Data() == nil {
+		return "Error - no fixtures for " + team
+	}
+
+	loc, err := time.LoadLocation("Europe/London")
+	if err != nil {
+		return "Error - " + err.Error()
+	}
+
+	fixturesArr := make([]string, 0)
+
+	var maxSize = 0;
+	for i := 0; i < toShow; i++ {
+		maxSize = maxSize + 1
+		if fixtures.Index(i).Data() == nil {
+			break
 		}
 
-		return result
-	}
-
-	var output []string
-
-	// Helper function to look through DOM for elements of interest
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "tr" {
-			for _, a := range n.Attr {
-				if a.Key == "class" && (a.Val == "preview" || a.Val == "live") {
-					match := pr(n)
-					if len(match) == 0 {
-						break
-					}
-					match = match[1:]
-
-					// Add bold tags to teams
-					if len(match) == 6 {
-						match[1] = "\x02" + match[1] + "\x02"
-						match[3] = "\x02" + match[3] + "\x02"
-					} else if len(match) == 7 {
-						match[2] = "\x02" + match[2] + "\x02"
-						match[4] = "\x02" + match[4] + "\x02"
-					}
-
-					output = append(output, strings.Join(match, " "))
-					break
-				}
-			}
+		var compName = ""
+		var eventsNode *gabs.Container
+		if isTournament {
+			eventsNode = fixtures.Index(i)
+		} else {
+			compName = " - " + fixtures.Index(i).Path("name.first").Data().(string)
+			eventsNode = fixtures.Index(i).Path("events").Index(0)
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
+
+		var kickOffTime = eventsNode.Path("startTime").Data().(string)
+		t, err := time.Parse(time.RFC3339Nano, kickOffTime)
+		if err == nil {
+			kickOffTime = t.In(loc).Format("15:04 Aug 2")
 		}
-	}
-	f(root)
-
-	// Return at most 3 results
-	end := 3
-	if len(output) < end {
-		end = len(output)
+		var homeTeam = eventsNode.Path("homeTeam.name.first").Data().(string)
+		var awayTeam = eventsNode.Path("awayTeam.name.first").Data().(string)
+		fixturesArr = append(fixturesArr, fmt.Sprintf("\x02%s\x02 vs \x02%s\x02 (%s%s)", homeTeam, awayTeam, kickOffTime, compName))
 	}
 
-	if end == 0 {
-		fmt.Println("Fixtures not found: " + team)
-		return "Error - No fixtures found."
-	}
-
-	return strings.Replace(strings.Join(output[:end], " | "), "  ", " ", -1)
+	return strings.Join(fixturesArr[:], ", ")
 }
 
 // Figure out current time in the UK
@@ -598,11 +666,11 @@ func ShowTable(args string) string {
 		}
 	}
 
-	if _, ok := tables[zone]; !ok {
+	if _, ok := tournaments[zone]; !ok {
 		return "Error - Unknown zone"
 	}
 
-	resp, err := http.Get(tables[zone])
+	resp, err := http.Get(tournaments[zone])
 	if err != nil {
 		return "Error - " + err.Error()
 	}
@@ -724,7 +792,7 @@ func AllFixtures(zone, input string) string {
 		wantedDate = 1
 	}
 
-	url := fixtures[zone]
+	url := "" //fixtures[zone]
 	resp, err := http.Get(url)
 	if err != nil {
 		return "Error - " + err.Error()
