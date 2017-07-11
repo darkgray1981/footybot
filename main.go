@@ -150,6 +150,7 @@ var tournaments = map[string]string{
 	"SW":       "swiss-super-league",
 	"TK":       "turkish-super-lig",
 	"US":       "us-major-league",
+	"MLS":       "us-major-league",
 	"WPL":      "welsh-premier-league",
 	"WEC":      "womens-european-championship",
 	"WECQ":     "womens-european-championship-qualifying",
@@ -322,6 +323,7 @@ func LatestResults(team string) string {
 		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
 	}
 
+	fmt.Println("Results: " + site)
 	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
@@ -494,8 +496,9 @@ func TablePosition(team string) string {
 	return fmt.Sprintf("%s #%s \x02%s\x02 - P: %s, GD: %s, Pts: %s", m["competitionFilter"], m["position-number"], m["team-name"], m["played"], m["goal-difference"], m["points"])
 }
 
-// Get next matches on a club's schedule
-func NextMatch(team string) string {
+func ParseBbcFixtures(team string) (*footballMatches, string) {
+	parsedResponse := &footballMatches{}
+
 	var isTournament = false
 	if tournament, ok := tournaments[strings.ToUpper(team)]; ok {
 		team = tournament
@@ -505,55 +508,154 @@ func NextMatch(team string) string {
 	}
 
 	var site = ""
-	if (isTournament) {
+	if isTournament {
 		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
 	} else {
 		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
 	}
 
+	fmt.Println("Next Match: " + site)
 	resp, err := http.Get(site)
 	if err != nil {
-		return "Error - " + err.Error()
+		return nil, "Error - " + err.Error()
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		fmt.Println("Club not found: " + team)
-		return "Error - Club not found."
+		return nil, "Error - Club not found."
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "Error - " + err.Error()
+		return nil, "Error - " + err.Error()
 	}
 
-	jsonParsed, err := gabs.ParseJSON(body)
-	if err != nil {
-		return "Error - " + err.Error()
+	pushResponse := bbcPushResponse{}
+	json.Unmarshal(body, &pushResponse)
+	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
+		fmt.Println(string(body))
+		return nil, "Error - failed to parse BBC JSON response"
 	}
 
-	payload := jsonParsed.S("moments").Index(0).Path("payload").Data()
-	if (payload == nil) {
-		return "No fixtures found"
-	}
-
-	jsonParsed, err = gabs.ParseJSON([]byte(payload.(string)))
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
-	var fixtures *gabs.Container
-	var toShow = 3
+	// Tournament & Team responses differ in wrapper structure
 	if isTournament {
-		fixtures = jsonParsed.Path("fixtures.tournament.stages")
-		fixtures = fixtures.Index(0).Path("rounds")
-		fixtures = fixtures.Index(0).Path("events")
-		toShow = 10
+		payload := tournamentMatches{}
+		json.Unmarshal([]byte(pushResponse.Moments[0].Payload), &payload)
+
+		for i := 0; i < len(payload.Fixtures.Tournament.Stages); i++ {
+			stages := payload.Fixtures.Tournament.Stages[i].Rounds
+			for j := 0; j < len(stages); j++ {
+				matches := stages[j].Events
+				for k := 0; k < len(matches); k++ {
+					match := footballMatch{}
+					match.kickOffTime = matches[k].StartTime
+					match.isTournamentGame = true
+					match.Tournament = payload.Fixtures.Tournament.Name.First
+					match.HomeTeam = matches[k].HomeTeam
+					match.AwayTeam = matches[k].AwayTeam
+					parsedResponse.fixtures = append(parsedResponse.fixtures, match)
+				}
+			}
+		}
+
+		for i := 0; i < len(payload.Results.Tournament.Stages); i++ {
+			stages := payload.Results.Tournament.Stages[i].Rounds
+			for j := 0; j < len(stages); j++ {
+				matches := stages[j].Events
+				for k := 0; k < len(matches); k++ {
+					match := footballMatch{}
+					match.kickOffTime = matches[k].StartTime
+					match.isTournamentGame = true
+					match.Tournament = payload.Results.Tournament.Name.First
+					match.HomeTeam = matches[k].HomeTeam
+					match.AwayTeam = matches[k].AwayTeam
+					parsedResponse.results = append(parsedResponse.results, match)
+				}
+			}
+		}
+
+		for i := 0; i < len(payload.Today.Tournament.Stages); i++ {
+			stages := payload.Today.Tournament.Stages[i].Rounds
+			for j := 0; j < len(stages); j++ {
+				matches := stages[j].Events
+				for k := 0; k < len(matches); k++ {
+					match := footballMatch{}
+					match.kickOffTime = matches[k].StartTime
+					match.isTournamentGame = true
+					match.Tournament = payload.Results.Tournament.Name.First
+					match.HomeTeam = matches[k].HomeTeam
+					match.AwayTeam = matches[k].AwayTeam
+
+					if matches[k].EventProgress.Status == "RESULT" {
+						parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
+					} else {
+						parsedResponse.fixtures = append([]footballMatch{match}, parsedResponse.fixtures...)
+					}
+				}
+			}
+		}
 	} else {
-		fixtures = jsonParsed.Path("fixtures.body.rounds")
+		payload := teamMatches{}
+		json.Unmarshal([]byte(pushResponse.Moments[0].Payload), &payload)
+
+		for i := 0; i < len(payload.Fixtures.Body.Rounds); i++ {
+			matches := payload.Fixtures.Body.Rounds[i].Events
+			for j := 0; j < len(matches); j++ {
+				match := footballMatch{}
+				match.kickOffTime = matches[j].StartTime
+				match.isTournamentGame = false
+				match.Tournament = payload.Fixtures.Body.Rounds[i].Name.First
+				match.HomeTeam = matches[j].HomeTeam
+				match.AwayTeam = matches[j].AwayTeam
+				parsedResponse.fixtures = append(parsedResponse.fixtures, match)
+			}
+		}
+
+		for i := 0; i < len(payload.Results.Body.Rounds); i++ {
+			matches := payload.Results.Body.Rounds[i].Events
+			for j := 0; j < len(matches); j++ {
+				match := footballMatch{}
+				match.kickOffTime = matches[j].StartTime
+				match.isTournamentGame = false
+				match.Tournament = payload.Results.Body.Rounds[i].Name.First
+				match.HomeTeam = matches[j].HomeTeam
+				match.AwayTeam = matches[j].AwayTeam
+				parsedResponse.results = append(parsedResponse.results, match)
+			}
+		}
+
+		for i := 0; i < len(payload.Today.Body.Rounds); i++ {
+			matches := payload.Today.Body.Rounds[i].Events
+			for j := 0; j < len(matches); j++ {
+				match := footballMatch{}
+				match.kickOffTime = matches[j].StartTime
+				match.isTournamentGame = true
+				match.Tournament = payload.Results.Body.Rounds[i].Name.First
+				match.HomeTeam = matches[j].HomeTeam
+				match.AwayTeam = matches[j].AwayTeam
+
+				if matches[j].EventProgress.Status == "RESULT" {
+					parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
+				} else {
+					parsedResponse.fixtures = append([]footballMatch{match}, parsedResponse.fixtures...)
+				}
+			}
+		}
 	}
 
-	if fixtures.Data() == nil {
+	return parsedResponse, ""
+}
+
+// Get next matches on a club's schedule
+func NextMatch(team string) string {
+	var matches *footballMatches
+	matches, errorMsg := ParseBbcFixtures(team)
+	if matches == nil {
+		return errorMsg
+	}
+
+	if len(matches.fixtures) == 0 {
 		return "Error - no fixtures for " + team
 	}
 
@@ -564,29 +666,17 @@ func NextMatch(team string) string {
 
 	fixturesArr := make([]string, 0)
 
-	var maxSize = 0;
-	for i := 0; i < toShow; i++ {
-		maxSize = maxSize + 1
-		if fixtures.Index(i).Data() == nil {
-			break
-		}
+	for i := 0; i<len(matches.fixtures); i++ {
+		match := matches.fixtures[i]
 
 		var compName = ""
-		var eventsNode *gabs.Container
-		if isTournament {
-			eventsNode = fixtures.Index(i)
-		} else {
-			compName = " - " + fixtures.Index(i).Path("name.first").Data().(string)
-			eventsNode = fixtures.Index(i).Path("events").Index(0)
+		if !match.isTournamentGame {
+			compName = " - " + match.Tournament
 		}
 
-		var kickOffTime = eventsNode.Path("startTime").Data().(string)
-		t, err := time.Parse(time.RFC3339Nano, kickOffTime)
-		if err == nil {
-			kickOffTime = t.In(loc).Format("15:04 Aug 2")
-		}
-		var homeTeam = eventsNode.Path("homeTeam.name.first").Data().(string)
-		var awayTeam = eventsNode.Path("awayTeam.name.first").Data().(string)
+		var kickOffTime = match.kickOffTime.In(loc).Format("15:04 Aug 2")
+		var homeTeam = match.HomeTeam.Name.First
+		var awayTeam = match.AwayTeam.Name.First
 		fixturesArr = append(fixturesArr, fmt.Sprintf("\x02%s\x02 vs \x02%s\x02 (%s%s)", homeTeam, awayTeam, kickOffTime, compName))
 	}
 
