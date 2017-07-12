@@ -37,10 +37,10 @@ type scores struct {
 	Score int `json:"score"`
 	HalfTime int `json:"halfTime"`
 	FullTime int `json:"fullTime"`
-	ExtraTime int `json:"extraTime"`
-	Shootout int `json:"shootout"`
-	Aggregate int `json:"aggregate"`
-	AggregateGoalsAway int `json:"aggregateGoalsAway"`
+	ExtraTime interface{} `json:"extraTime"`
+	Shootout interface{} `json:"shootout"`
+	Aggregate interface{} `json:"aggregate"`
+	AggregateGoalsAway interface{} `json:"aggregateGoalsAway"`
 }
 
 type tournamentEvent struct {
@@ -70,7 +70,7 @@ type tournamentEvent struct {
 type teamEvent struct {
 	EventKey string `json:"eventKey"`
 	StartTime time.Time `json:"startTime"`
-	MinutesElapsed interface{} `json:"minutesElapsed"`
+	MinutesElapsed int `json:"minutesElapsed"`
 	MinutesIntoAddedTime interface{} `json:"minutesIntoAddedTime"`
 	EventStatus string `json:"eventStatus"`
 	EventStatusNote string `json:"eventStatusNote"`
@@ -170,10 +170,12 @@ type teamMatches struct {
 // Pseudo struct
 type footballMatch struct {
 	kickOffTime time.Time
+	inProgress bool
 	isTournamentGame bool
 	Tournament string
 	HomeTeam team
 	AwayTeam team
+	minutesElapsed int
 }
 
 type footballMatches struct {

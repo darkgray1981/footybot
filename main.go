@@ -14,7 +14,6 @@ import (
 
 	"github.com/thoj/go-ircevent"
 	"golang.org/x/net/html"
-	"github.com/Jeffail/gabs"
 )
 
 // Google API key/CX for google searches
@@ -308,101 +307,20 @@ func Currency(query string) string {
 
 // Return latest results for a club
 func LatestResults(team string) string {
-	var isTournament = false
-	if tournament, ok := tournaments[strings.ToUpper(team)]; ok {
-		team = tournament
-		isTournament = true
-	} else {
-		team = checkAlias(team)
+	var matches *footballMatches
+	matches, errorMsg := ParseBbcFixtures(team)
+	if matches == nil {
+		return errorMsg
 	}
 
-	var site = ""
-	if (isTournament) {
-		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
-	} else {
-		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
-	}
-
-	fmt.Println("Results: " + site)
-	resp, err := http.Get(site)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		fmt.Println("Club not found: " + team)
-		return "Error - Club not found."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
-	jsonParsed, err := gabs.ParseJSON(body)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
-	payload := jsonParsed.S("moments").Index(0).Path("payload").Data()
-	if (payload == nil) {
-		return "No results found"
-	}
-
-	jsonParsed, err = gabs.ParseJSON([]byte(payload.(string)))
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
-	var results *gabs.Container
-	var toShow = 3
-	if isTournament {
-		results = jsonParsed.Path("results.tournament.stages")
-		results = results.Index(0).Path("rounds")
-		results = results.Index(0).Path("events")
-		toShow = 10
-	} else {
-		results = jsonParsed.Path("results.body.rounds")
-	}
-
-	if results.Data() == nil {
-		return "Error - no results for " + team
+	if len(matches.results) == 0 {
+		return "Error - no fixtures for " + team
 	}
 
 	resultsArr := make([]string, 0)
 
-	for i := 0; i < toShow; i++ {
-		var compName = ""
-		var eventsNode *gabs.Container
-		if isTournament {
-			eventsNode = results.Index(i)
-
-			if eventsNode.Data() == nil {
-				break
-			}
-		} else {
-			compName = " (" + results.Index(i).Path("name.first").Data().(string) + ")"
-			eventsNode = results.Index(i).Path("events").Index(0)
-		}
-		var homeTeam = eventsNode.Path("homeTeam.name.first").Data().(string)
-		var homeGoals = int(eventsNode.Path("homeTeam.scores.fullTime").Data().(float64))
-		var homeGoalsEt = eventsNode.Path("homeTeam.scores.extraTime").Data()
-		var awayTeam = eventsNode.Path("awayTeam.name.first").Data().(string)
-		var awayGoals = int(eventsNode.Path("awayTeam.scores.fullTime").Data().(float64))
-		var awayGoalsEt = eventsNode.Path("awayTeam.scores.extraTime").Data()
-
-		if homeGoalsEt != nil && awayGoalsEt != nil {
-			var homeGoalsShootout = eventsNode.Path("homeTeam.scores.shootout").Data()
-			var awayGoalsShootout = eventsNode.Path("awayTeam.scores.shootout").Data()
-			if homeGoalsShootout != nil && awayGoalsShootout != nil {
-				resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET (Pens %d-%d)%s", homeTeam, int(homeGoalsEt.(float64)), int(awayGoalsEt.(float64)), awayTeam, int(homeGoalsShootout.(float64)), int(awayGoalsShootout.(float64)), compName))
-			} else {
-				resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET%s", homeTeam, int(homeGoalsEt.(float64)), int(awayGoalsEt.(float64)), awayTeam, compName))
-			}
-		} else {
-			resultsArr = append(resultsArr, fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02%s", homeTeam, homeGoals, awayGoals, awayTeam, compName))
-		}
+	for i := 0; i<len(matches.results); i++ {
+		resultsArr = append(resultsArr, formatMatchResult(matches.results[i]))
 	}
 
 	return strings.Join(resultsArr[:], ", ")
@@ -514,7 +432,6 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
 	}
 
-	fmt.Println("Next Match: " + site)
 	resp, err := http.Get(site)
 	if err != nil {
 		return nil, "Error - " + err.Error()
@@ -586,11 +503,13 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 					match.Tournament = payload.Results.Tournament.Name.First
 					match.HomeTeam = matches[k].HomeTeam
 					match.AwayTeam = matches[k].AwayTeam
+					match.inProgress = matches[k].EventProgress.Status != "RESULT"
+					match.minutesElapsed = matches[k].MinutesElapsed
 
-					if matches[k].EventProgress.Status == "RESULT" {
-						parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
-					} else {
+					if match.inProgress {
 						parsedResponse.fixtures = append([]footballMatch{match}, parsedResponse.fixtures...)
+					} else {
+						parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
 					}
 				}
 			}
@@ -604,7 +523,6 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 			for j := 0; j < len(matches); j++ {
 				match := footballMatch{}
 				match.kickOffTime = matches[j].StartTime
-				match.isTournamentGame = false
 				match.Tournament = payload.Fixtures.Body.Rounds[i].Name.First
 				match.HomeTeam = matches[j].HomeTeam
 				match.AwayTeam = matches[j].AwayTeam
@@ -617,7 +535,6 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 			for j := 0; j < len(matches); j++ {
 				match := footballMatch{}
 				match.kickOffTime = matches[j].StartTime
-				match.isTournamentGame = false
 				match.Tournament = payload.Results.Body.Rounds[i].Name.First
 				match.HomeTeam = matches[j].HomeTeam
 				match.AwayTeam = matches[j].AwayTeam
@@ -630,15 +547,16 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 			for j := 0; j < len(matches); j++ {
 				match := footballMatch{}
 				match.kickOffTime = matches[j].StartTime
-				match.isTournamentGame = true
 				match.Tournament = payload.Results.Body.Rounds[i].Name.First
 				match.HomeTeam = matches[j].HomeTeam
 				match.AwayTeam = matches[j].AwayTeam
+				match.inProgress = matches[j].EventProgress.Status != "RESULT"
+				match.minutesElapsed = matches[j].MinutesElapsed
 
-				if matches[j].EventProgress.Status == "RESULT" {
-					parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
-				} else {
+				if match.inProgress {
 					parsedResponse.fixtures = append([]footballMatch{match}, parsedResponse.fixtures...)
+				} else {
+					parsedResponse.results = append([]footballMatch{match}, parsedResponse.results...)
 				}
 			}
 		}
@@ -674,13 +592,60 @@ func NextMatch(team string) string {
 			compName = " - " + match.Tournament
 		}
 
-		var kickOffTime = match.kickOffTime.In(loc).Format("15:04 Aug 2")
-		var homeTeam = match.HomeTeam.Name.First
-		var awayTeam = match.AwayTeam.Name.First
-		fixturesArr = append(fixturesArr, fmt.Sprintf("\x02%s\x02 vs \x02%s\x02 (%s%s)", homeTeam, awayTeam, kickOffTime, compName))
+		if match.inProgress {
+			fixturesArr = append(fixturesArr, formatMatchResult(match))
+		} else {
+			var kickOffTime = match.kickOffTime.In(loc).Format("15:04 Aug 2")
+			var homeTeam = match.HomeTeam.Name.First
+			var awayTeam = match.AwayTeam.Name.First
+
+			fixturesArr = append(fixturesArr, fmt.Sprintf("\x02%s\x02 vs \x02%s\x02 (%s%s)", homeTeam, awayTeam, kickOffTime, compName))
+		}
 	}
 
 	return strings.Join(fixturesArr[:], ", ")
+}
+
+func formatMatchResult(match footballMatch) string {
+	var matchResult = ""
+
+	var compName = ""
+	if !match.isTournamentGame {
+		compName = " (" + match.Tournament + ")"
+	}
+
+	var homeTeam = match.HomeTeam.Name.First
+	var homeGoals = match.HomeTeam.Scores.Score
+	var awayTeam = match.AwayTeam.Name.First
+	var awayGoals = match.AwayTeam.Scores.Score
+	var progressStr = ""
+	if match.inProgress {
+		progressStr = fmt.Sprintf(" '%d", match.minutesElapsed)
+	}
+
+	if match.HomeTeam.Scores.ExtraTime != nil && match.AwayTeam.Scores.ExtraTime != nil {
+		var homeGoalsEt = match.HomeTeam.Scores.ExtraTime.(float64)
+		var awayGoalsEt = match.AwayTeam.Scores.ExtraTime.(float64)
+		if match.HomeTeam.Scores.Shootout != nil && match.AwayTeam.Scores.Shootout != nil {
+			var homeGoalsShootout = match.HomeTeam.Scores.Shootout.(float64)
+			var awayGoalsShootout = match.AwayTeam.Scores.Shootout.(float64)
+			if match.inProgress {
+				matchResult = fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 (Pens %d-%d)%s", homeTeam, int(homeGoalsEt), int(awayGoalsEt), awayTeam, int(homeGoalsShootout), int(awayGoalsShootout), compName)
+			} else {
+				matchResult = fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET (Pens %d-%d)%s", homeTeam, int(homeGoalsEt), int(awayGoalsEt), awayTeam, int(homeGoalsShootout), int(awayGoalsShootout), compName)
+			}
+		} else {
+			if match.inProgress {
+				matchResult = fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02%s%s", homeTeam, int(homeGoalsEt), int(awayGoalsEt), progressStr, awayTeam, compName)
+			} else {
+				matchResult = fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02 AET%s", homeTeam, int(homeGoalsEt), int(awayGoalsEt), awayTeam, compName)
+			}
+		}
+	} else {
+		matchResult = fmt.Sprintf("\x02%s\x02 %d-%d \x02%s\x02%s%s", homeTeam, homeGoals, awayGoals, awayTeam, progressStr, compName)
+	}
+
+	return matchResult
 }
 
 // Figure out current time in the UK
