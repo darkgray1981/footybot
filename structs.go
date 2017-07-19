@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// BBC Response structs
 type bbcPushResponse struct {
 	Moments []struct {
 		Topic string `json:"topic"`
@@ -167,10 +168,41 @@ type teamMatches struct {
 	Results teamMatch `json:"results"`
 }
 
-// Pseudo struct
+type fixtureList struct {
+	FixtureListMeta struct {
+		ScorersButtonShouldBeEnabled bool `json:"scorersButtonShouldBeEnabled"`
+	} `json:"fixtureListMeta"`
+	MatchData []struct {
+		TournamentMeta struct {
+			TournamentSlug string `json:"tournamentSlug"`
+			TournamentName struct {
+				First string `json:"first"`
+				Full string `json:"full"`
+				Abbreviation string `json:"abbreviation"`
+			} `json:"tournamentName"`
+		} `json:"tournamentMeta"`
+		TournamentDatesWithEvents map[string][]tournamentFixtures `json:"tournamentDatesWithEvents"`
+	} `json:"matchData"`
+}
+
+type tournamentFixtures struct {
+	Round struct {
+		Key string `json:"key"`
+		Name struct {
+			First string `json:"first"`
+			Full string `json:"full"`
+			Abbreviation string `json:"abbreviation"`
+		} `json:"name"`
+	} `json:"round"`
+	Events []teamEvent  `json:"events"`
+}
+
+// Internal structs
 type footballMatch struct {
 	kickOffTime time.Time
+	isFixture bool
 	inProgress bool
+	isResult bool
 	isTournamentGame bool
 	Tournament string
 	HomeTeam team
