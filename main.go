@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -13,7 +12,6 @@ import (
 	"time"
 
 	"github.com/thoj/go-ircevent"
-	"golang.org/x/net/html"
 )
 
 // Google API key/CX for google searches
@@ -44,7 +42,7 @@ const BASE_LEAGUE_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-t
 const BASE_FIXTURES_URL = "morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/%s/version/2.2.1/withPlayerActions/false"
 
 // One %s param = competition
-const BASE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.4.1"
+const BASE_LEAGUE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.4.1"
 
 var aliases = map[string]string{
 	"city":          "manchester city",
@@ -329,7 +327,9 @@ func LatestResults(team string) string {
 func TablePosition(team string) string {
 	team = checkAlias(team)
 
-	resp, err := http.Get("http://www.bbc.co.uk/sport/football/teams/" + team + "/fixtures")
+	return "TablePosition"
+
+	/*resp, err := http.Get("http://www.bbc.co.uk/sport/football/teams/" + team + "/fixtures")
 	if err != nil {
 		return "Error - " + err.Error()
 	}
@@ -410,7 +410,7 @@ func TablePosition(team string) string {
 		return "Error - No table found."
 	}
 
-	return fmt.Sprintf("%s #%s \x02%s\x02 - P: %s, GD: %s, Pts: %s", m["competitionFilter"], m["position-number"], m["team-name"], m["played"], m["goal-difference"], m["points"])
+	return fmt.Sprintf("%s #%s \x02%s\x02 - P: %s, GD: %s, Pts: %s", m["competitionFilter"], m["position-number"], m["team-name"], m["played"], m["goal-difference"], m["points"])*/
 }
 
 func ParseBbcFixtures(team string) (*footballMatches, string) {
@@ -734,125 +734,117 @@ func Google(query string) string {
 // Return current league table positions
 func ShowTable(args string) string {
 
+	maxLen := 2
+	if strings.HasPrefix(args, "#") {
+		maxLen = 3
+	}
 	zone := "EN" // Default to Premier League
-	var pos string
-	splitargs := strings.SplitN(args, " ", 2)
+	subZone := "" // No default subzone
+	pos := "1-6" // Default to show pos 1-6
+	splitArgs := strings.SplitN(args, " ", maxLen)
 
-	if len(splitargs) < 1 {
+	if len(splitArgs) < 1 {
 		return "Error - No parameters"
 	} else {
-		pos = splitargs[0]
+		if strings.HasPrefix(splitArgs[0], "#") {
+			pos = splitArgs[0][1:]
 
-		if len(splitargs) == 2 {
-			zone = strings.ToUpper(splitargs[1])
+			if len(splitArgs) > 1 {
+				zone = strings.ToUpper(splitArgs[1])
+				if len(splitArgs) > 2 {
+					subZone = strings.ToUpper(splitArgs[2])
+				}
+			}
+		} else {
+			if splitArgs[0] != "" {
+				zone = strings.ToUpper(splitArgs[0])
+				if len(splitArgs) > 1 {
+					subZone = strings.ToUpper(splitArgs[1])
+				}
+			}
 		}
+	}
+
+	positions := strings.Split(pos, "-")
+	var fromPos = 1
+	var toPos = 6
+	if len(positions) == 2 && len(positions[1]) > 0 {
+		if from, err := strconv.Atoi(positions[0]); err == nil {
+			fromPos = from
+		}
+		if to, err := strconv.Atoi(positions[1]); err == nil {
+			toPos = to
+		}
+	} else if len(positions) == 1 {
+		if from, err := strconv.Atoi(positions[0]); err == nil {
+			fromPos = from
+			toPos = fromPos
+		}
+	}
+
+	if fromPos < 1 || toPos <1 || fromPos > toPos {
+		return "Invalid table positions"
 	}
 
 	if _, ok := tournaments[zone]; !ok {
 		return "Error - Unknown zone"
 	}
 
-	resp, err := http.Get(tournaments[zone])
+	var site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_TABLE_URL, tournaments[zone]))
+	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Println("League not found")
-		return "Error - League not found."
+		return "Error - Table not found."
 	}
 
-	// Run HTML parser to get DOM
-	root, err := html.Parse(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 
-	// Map to store entire league
-	league := make(map[string]map[string]string)
-
-	// Helper function to save text nodes in a subtree
-	var pr func(string, *html.Node, map[string]string)
-	pr = func(parentClass string, n *html.Node, m map[string]string) {
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.TextNode {
-				trimmed := strings.TrimSpace(c.Data)
-				if len(trimmed) > 0 {
-					m[parentClass] = trimmed
-				}
-			}
-
-			// Retain parent's class name unless we have one of our own
-			childClass := parentClass
-			for _, a := range c.Attr {
-				if a.Key == "class" {
-					childClass = a.Val
-					break
-				}
-			}
-
-			pr(childClass, c, m)
-		}
+	pushResponse := bbcPushResponse{}
+	json.Unmarshal(body, &pushResponse)
+	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
+		fmt.Println(site + " " + string(body))
+		return "Error - failed to parse BBC JSON response"
 	}
 
-	// Helper function to look through DOM for elements of interest
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "tr" {
-			// Grab club details
-			for _, a := range n.Attr {
-				if a.Key == "class" && strings.HasPrefix(a.Val, "team") {
-					m := make(map[string]string)
-					pr(a.Val, n, m)
-					if len(m) != 0 {
-						if _, ok := league[m["position-number"]]; !ok {
-							league[m["position-number"]] = m
-						}
-					}
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(root)
+	table := leagueTable{}
+	json.Unmarshal([]byte(pushResponse.Moments[0].Payload), &table)
 
-	if len(league) == 0 {
-		fmt.Println("League table not found")
-		return "Error - No league table found."
-	}
+	result := ""
+	var multiTable = len(table.SportTables.Tables) > 1
+	tableIndex := 0
 
-	result := "Error - position not found."
-
-	positions := strings.Split(pos, "-")
-	if len(positions) == 2 && len(positions[1]) > 0 {
-		var buf bytes.Buffer
-
-		from, _ := strconv.Atoi(positions[0])
-		to, _ := strconv.Atoi(positions[1])
-
-		for i := from; i <= to; i++ {
-			if m, ok := league[strconv.Itoa(i)]; ok {
-				if i > from {
-					buf.WriteString(" | ")
-				}
-
-				s := fmt.Sprintf("#%s \x02%s\x02 (%sp)", m["position-number"], m["team-name"], m["points"])
-				buf.WriteString(s)
-
+	for i := 0; i<len(table.SportTables.Tables); i++ {
+		if multiTable && subZone != "" {
+			if strings.HasPrefix(strings.ToUpper(table.SportTables.Tables[i].Group.Name), subZone) {
+				tableIndex = i
 			} else {
-				return result
+				continue
 			}
 		}
 
-		result = buf.String()
-
-	} else {
-		if m, ok := league[positions[0]]; ok {
-			result = fmt.Sprintf("#%s \x02%s\x02 - P: %s, GD: %s, Pts: %s", m["position-number"], m["team-name"], m["played"], m["goal-difference"], m["points"])
+		var rows = table.SportTables.Tables[tableIndex].Rows
+		if toPos > len(rows)  {
+			return "Invalid table positions"
 		}
+
+		for j := fromPos; j <= toPos; j++ {
+			var team = rows[j - 1];
+			var teamName = team.Cells[2].Td.AbbrLink.Abbr;
+			if teamName == "" {
+				teamName = team.Cells[2].Td.Abbr
+			}
+
+			result = result + fmt.Sprintf("#%d \x02%s\x02 - P: %d, GD: %d, Pts: %d ", j, teamName, team.Cells[3].Td.Text, team.Cells[9].Td.Text, team.Cells[10].Td.Text)
+		}
+
+		break
 	}
 
 	return result
@@ -985,7 +977,7 @@ func runBot() {
 		var result string
 		arg := event.Message()[len(cmd):]
 		if strings.HasPrefix(arg, "#") {
-			result = ShowTable(arg[1:])
+			result = ShowTable(arg)
 		} else {
 			result = TablePosition(arg)
 		}
@@ -1198,7 +1190,7 @@ func runBot() {
 			return
 		}
 
-		result := AllFixtures("AU", event.Message()[len(cmd):])
+		result := AllFixtures("AUS", event.Message()[len(cmd):])
 
 		message := event.Nick + ": " + result
 
