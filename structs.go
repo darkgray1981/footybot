@@ -197,6 +197,55 @@ type tournamentFixtures struct {
 	Events []teamEvent  `json:"events"`
 }
 
+type leagueTable struct {
+	SportTables struct {
+		Title string `json:"title"`
+		Tables []struct {
+			Group struct {
+				Name string `json:"name"`
+			} `json:"group"`
+			Live bool `json:"live"`
+			Styles struct {
+			} `json:"styles"`
+			Headings []struct {
+				Cells []struct {
+					Th struct {
+						Live bool `json:"live"`
+					} `json:"th"`
+				} `json:"cells"`
+			} `json:"headings"`
+			Rows []struct {
+				RowStyles string `json:"rowStyles"`
+				Cells []struct {
+					Td struct {
+						Text int `json:"text"`
+						Abbr string `json:"abbr"`
+						Icon string `json:"icon"`
+						Styles string `json:"styles"`
+						AbbrLink struct {
+							Link string `json:"link"`
+							Text string `json:"text"`
+							Abbr string `json:"abbr"`
+							AbbrStyles string `json:"abbrStyles"`
+						} `json:"abbrLink"`
+					} `json:"td"`
+				} `json:"cells"`
+			} `json:"rows"`
+			Footer []struct {
+				Cells []struct {
+					Td struct {
+						Colspan int `json:"colspan"`
+						Time time.Time `json:"time"`
+						Text string `json:"text"`
+						Styles string `json:"styles"`
+					} `json:"td"`
+				} `json:"cells"`
+			} `json:"footer"`
+		} `json:"tables"`
+	} `json:"sportTables"`
+}
+
+
 // Internal structs
 type footballMatch struct {
 	kickOffTime time.Time
