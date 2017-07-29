@@ -245,6 +245,56 @@ type leagueTable struct {
 	} `json:"sportTables"`
 }
 
+// No idea why this is an array - thanks BBC
+type teamLeagueTable []struct {
+	Tournament struct {
+		Name struct {
+			Full string `json:"full"`
+			First string `json:"first"`
+			Abbreviation string `json:"abbreviation"`
+			VideCode string `json:"videCode"`
+		} `json:"name"`
+		Homepage string `json:"homepage"`
+		Slug string `json:"slug"`
+	} `json:"tournament"`
+	Tables []struct {
+		Round struct {
+			Meta struct {
+				RoundKey string `json:"roundKey"`
+				NamePriority string `json:"namePriority"`
+			} `json:"meta"`
+			Name interface{} `json:"name"`
+		} `json:"round"`
+		Teams []struct {
+			Name struct {
+				Full string `json:"full"`
+				First string `json:"first"`
+				Abbreviation string `json:"abbreviation"`
+				VideCode string `json:"videCode"`
+			} `json:"name"`
+			Slug string `json:"slug"`
+			Homepage string `json:"homepage"`
+			Key string `json:"key"`
+			Stats struct {
+				Played int `json:"played"`
+				Won int `json:"won"`
+				Drawn int `json:"drawn"`
+				Lost int `json:"lost"`
+				GoalsFor int `json:"goalsFor"`
+				GoalsAgainst int `json:"goalsAgainst"`
+				GoalDifference int `json:"goalDifference"`
+				Points int `json:"points"`
+			} `json:"stats"`
+			Rank struct {
+				Current int `json:"current"`
+				Previous int `json:"previous"`
+				Movement string `json:"movement"`
+			} `json:"rank"`
+		} `json:"teams"`
+		Boundaries []int `json:"boundaries"`
+	} `json:"tables"`
+}
+
 
 // Internal structs
 type footballMatch struct {
