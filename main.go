@@ -916,7 +916,7 @@ func AllFixtures(zone, input string) string {
 		if fixtures[i].isResult || fixtures[i].inProgress {
 			matchesArr = append(matchesArr, formatMatchResult(fixtures[i]))
 		} else {
-			var kickOffTime = fixtures[i].kickOffTime.In(loc).Format("15:04 Aug 2")
+			var kickOffTime = fixtures[i].kickOffTime.In(loc).Format("15:04 Jan 2")
 			var homeTeam = fixtures[i].HomeTeam.Name.First
 			var awayTeam = fixtures[i].AwayTeam.Name.First
 			var compName = ""
