@@ -41,8 +41,11 @@ const BASE_LEAGUE_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-t
 // Three %s params - endDate, startDate, tournament
 const BASE_FIXTURES_URL = "morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/%s/version/2.2.1/withPlayerActions/false"
 
-// One %s param = competition
+// One %s param - tournament
 const BASE_LEAGUE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.4.1"
+
+// One %s param - team name
+const BASE_TEAM_TABLE_URL = "morph://data/bbc-morph-sport-football-table-team-model/team/%s/version/1.0.4"
 
 var aliases = map[string]string{
 	"city":          "manchester city",
@@ -327,90 +330,55 @@ func LatestResults(team string) string {
 func TablePosition(team string) string {
 	team = checkAlias(team)
 
-	return "TablePosition"
-
-	/*resp, err := http.Get("http://www.bbc.co.uk/sport/football/teams/" + team + "/fixtures")
+	var site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_TABLE_URL, team))
+	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		fmt.Println("Club not found: " + team)
-		return "Error - Club not found."
+		return "Error - Table not found."
 	}
 
-	// Run HTML parser to get DOM
-	root, err := html.Parse(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "Error - " + err.Error()
 	}
 
-	// Map to store details of interest
-	m := make(map[string]string)
+	pushResponse := bbcPushResponse{}
+	json.Unmarshal(body, &pushResponse)
+	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
+		fmt.Println(site + " " + string(body))
+		return "Error - failed to parse BBC JSON response"
+	}
 
-	// Helper function to save text nodes in a subtree
-	var pr func(string, *html.Node)
-	pr = func(parentClass string, n *html.Node) {
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			if c.Type == html.TextNode {
-				trimmed := strings.TrimSpace(c.Data)
-				if len(trimmed) > 0 {
-					m[parentClass] = trimmed
+	leagueTable := teamLeagueTable{}
+	json.Unmarshal([]byte(pushResponse.Moments[0].Payload), &leagueTable)
+
+	for i := 0; i < len(leagueTable); i++ {
+		for j := 0; j < len(leagueTable[i].Tables); j++ {
+			teams := leagueTable[i].Tables[j].Teams
+			for k := 0; k < len(teams); k++ {
+				if teams[k].Slug == team {
+					compName := leagueTable[i].Tournament.Name.Abbreviation
+					teamName := teams[k].Name.Abbreviation
+					position := teams[k].Rank.Current
+					played := teams[k].Stats.Played
+					won := teams[k].Stats.Won
+					drawn := teams[k].Stats.Drawn
+					lost := teams[k].Stats.Lost
+					goalsFor := teams[k].Stats.GoalsFor
+					goalsAgainst := teams[k].Stats.GoalsAgainst
+					goalDiff := teams[k].Stats.GoalDifference
+					points := teams[k].Stats.Points
+					return fmt.Sprintf("%s #%d \x02%s\x02 - P: %d, W: %d, D: %d, L: %d, F: %d, A: %d, GD: %d, Pts: %d", compName, position, teamName, played, won, drawn, lost, goalsFor, goalsAgainst, goalDiff, points)
 				}
 			}
-
-			// Retain parent's class name unless we have one of our own
-			childClass := parentClass
-			for _, a := range c.Attr {
-				if a.Key == "class" {
-					childClass = a.Val
-					break
-				}
-			}
-
-			pr(childClass, c)
 		}
 	}
 
-	// Helper function to look through DOM for elements of interest
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		if n.Type == html.ElementNode && n.Data == "tr" {
-			// Grab club details
-			for _, a := range n.Attr {
-				if a.Key == "class" && strings.Contains(a.Val, "current-team") {
-					pr(a.Val, n)
-					break
-				}
-			}
-		} else if n.Type == html.ElementNode && n.Data == "select" {
-			// Grab league name
-			for _, a := range n.Attr {
-				if a.Key == "id" && a.Val == "competitionFilter" {
-					for c := n.FirstChild; c != nil; c = c.NextSibling {
-						for _, attr := range c.Attr {
-							if attr.Key == "selected" {
-								pr(a.Val, c)
-								break
-							}
-						}
-					}
-				}
-			}
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-	}
-	f(root)
-
-	if len(m) == 0 {
-		fmt.Println("Table not found: " + team)
-		return "Error - No table found."
-	}
-
-	return fmt.Sprintf("%s #%s \x02%s\x02 - P: %s, GD: %s, Pts: %s", m["competitionFilter"], m["position-number"], m["team-name"], m["played"], m["goal-difference"], m["points"])*/
+	return "Team table not found"
 }
 
 func ParseBbcFixtures(team string) (*footballMatches, string) {
@@ -738,13 +706,15 @@ func ShowTable(args string) string {
 	if strings.HasPrefix(args, "#") {
 		maxLen = 3
 	}
-	zone := "EN" // Default to Premier League
+	zone := "EN"  // Default to Premier League
 	subZone := "" // No default subzone
-	pos := "1-6" // Default to show pos 1-6
+	pos := "1-6"  // Default to show pos 1-6
 	splitArgs := strings.SplitN(args, " ", maxLen)
 
 	if len(splitArgs) < 1 {
 		return "Error - No parameters"
+	} else if !strings.HasPrefix(args, "#") && tournaments[splitArgs[0]] == "" {
+		return TablePosition(splitArgs[0])
 	} else {
 		if strings.HasPrefix(splitArgs[0], "#") {
 			pos = splitArgs[0][1:]
@@ -782,7 +752,7 @@ func ShowTable(args string) string {
 		}
 	}
 
-	if fromPos < 1 || toPos <1 || fromPos > toPos {
+	if fromPos < 1 || toPos < 1 || fromPos > toPos {
 		return "Invalid table positions"
 	}
 
@@ -816,11 +786,11 @@ func ShowTable(args string) string {
 	table := leagueTable{}
 	json.Unmarshal([]byte(pushResponse.Moments[0].Payload), &table)
 
-	result := ""
+	tableStr := make([]string, 0)
 	var multiTable = len(table.SportTables.Tables) > 1
 	tableIndex := 0
 
-	for i := 0; i<len(table.SportTables.Tables); i++ {
+	for i := 0; i < len(table.SportTables.Tables); i++ {
 		if multiTable && subZone != "" {
 			if strings.HasPrefix(strings.ToUpper(table.SportTables.Tables[i].Group.Name), subZone) {
 				tableIndex = i
@@ -830,24 +800,24 @@ func ShowTable(args string) string {
 		}
 
 		var rows = table.SportTables.Tables[tableIndex].Rows
-		if toPos > len(rows)  {
+		if toPos > len(rows) {
 			return "Invalid table positions"
 		}
 
 		for j := fromPos; j <= toPos; j++ {
-			var team = rows[j - 1];
+			var team = rows[j-1];
 			var teamName = team.Cells[2].Td.AbbrLink.Abbr;
 			if teamName == "" {
 				teamName = team.Cells[2].Td.Abbr
 			}
 
-			result = result + fmt.Sprintf("#%d \x02%s\x02 - P: %d, GD: %d, Pts: %d ", j, teamName, team.Cells[3].Td.Text, team.Cells[9].Td.Text, team.Cells[10].Td.Text)
+			tableStr = append(tableStr, fmt.Sprintf("#%d \x02%s\x02 - P: %d, GD: %d, Pts: %d", j, teamName, team.Cells[3].Td.Text, team.Cells[9].Td.Text, team.Cells[10].Td.Text))
 		}
 
 		break
 	}
 
-	return result
+	return strings.Join(tableStr, " | ")
 }
 
 // Get upcoming games from all leagues
@@ -974,13 +944,8 @@ func runBot() {
 			return
 		}
 
-		var result string
 		arg := event.Message()[len(cmd):]
-		if strings.HasPrefix(arg, "#") {
-			result = ShowTable(arg)
-		} else {
-			result = TablePosition(arg)
-		}
+		var result = ShowTable(arg)
 
 		message := event.Nick + ": " + result
 
