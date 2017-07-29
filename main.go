@@ -19,10 +19,10 @@ const GOOGLE_API_KEY = "paste key here"
 const GOOGLE_CX = "paste cx here"
 
 // IRC config
-const IRC_NICK = "footybot-JB"
+const IRC_NICK = "footybot"
 const IRC_USER = "botness"
 const IRC_SERVER = "irc.synirc.net:6667"
-const IRC_CHANNEL = "#epl-test"
+const IRC_CHANNEL = "#epl"
 
 // Main program loop
 func main() {
@@ -49,16 +49,16 @@ const BASE_TEAM_TABLE_URL = "morph://data/bbc-morph-sport-football-table-team-mo
 
 var bbcRateLimit = 1
 
-var lastApiLookup = int64(0)
+var lastApiLookup = time.Now()
 
 func getBbcBaseUrl() string {
-	if time.Now().Unix() - lastApiLookup < 30000 {
+	if time.Since(lastApiLookup) < 30 * time.Second {
 		bbcRateLimit += 1
 	} else {
 		bbcRateLimit = 1
 	}
 
-	lastApiLookup = time.Now().Unix()
+	lastApiLookup = time.Now()
 
 	return fmt.Sprintf(BASE_BBC_URL, bbcRateLimit)
 }

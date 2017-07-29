@@ -1,26 +1,18 @@
 # footybot
 Football information dispensing IRC bot
 
-For a long time, this bot has been serving #epl with pluck, but BBC went and changed their APIs, so nothing works anymore. It's up to you (or me, or someone) to either puzzle out a way to parse the new API, or to find something better, in order to resurrect its full functionality.
+Parses the BBC Push API to get various fixtures, results and table information for football teams.
 
-While the old BBC data could be simply parsed from the web tables, the new one uses React in combination with an API server, returning blobs of JSON.
+The BBC Push API takes an internal "morph" URL which refers to a specific piece of data, the URLs we use are:
 
-The general scores and fixturs page is located at  
-http://www.bbc.com/sport/football/scores-fixtures  
-which makes queries in the form of:  
-http://push.api.bbci.co.uk/p?t=morph%3A%2F%2Fdata%2Fbbc-morph-football-scores-match-list-data%2FendDate%2F2017-07-05%2FstartDate%2F2017-07-05%2Ftournament%2Ffull-priority-order%2Fversion%2F2.2.1%2FwithPlayerActions%2Ffalse
+morph://data/bbc-morph-sport-football-scores-tabbed-teams-model/isApp/false/limit/4/team/%s/version/1.0.6 - Returns the fixtures and results for a team.
 
-There are then individual team pages located at  
-http://www.bbc.com/sport/football/teams/arsenal/scores-fixtures  
-which make queries in the form of:  
-http://push.api.bbci.co.uk/p?t=morph%3A%2F%2Fdata%2Fbbc-morph-football-scores-match-list-data%2FendDate%2F2018-08-31%2FstartDate%2F2017-08-01%2Fteam%2Farsenal%2Fversion%2F2.2.1%2FwithPlayerActions%2Ffalse
+morph://data/bbc-morph-sport-football-scores-tabbed-model/isApp/false/limit/12/tournament/%s/version/2.0.0 - Returns the fixtures and results for a competition/tournament.
 
-A formatted sample of the returned data: https://hastebin.com/wilejivewi.json
+morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/%s/version/2.2.1/withPlayerActions/false - Returns the fixtures for a tournament in a given date range.
 
+morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.5.0 - Returns the league table for a given competition/tournament, note for MLS and such like it is all tables in that competition.
 
-The league tables section has changed as well, currently displayed at  
-http://www.bbc.com/sport/football/tables  
-with individual clubs highlighted in API queries like this:  
-http://push.api.bbci.co.uk/p?t=morph%3A%2F%2Fdata%2Fbbc-morph-sport-football-tables-data%2Fteam%2Farsenal%2FteamName%2FArsenal%2Fversion%2F1.4.1
+morph://data/bbc-morph-sport-football-table-team-model/team/%s/version/1.0.4 - Returns the league table for a given team - the team name matches the "slug" parameter in the JSON response.
 
---darkgray@synirc
+Note: To show tables from multi-group leagues (MLS, World Cup, Euros etc) the ShowTable method can take a zone (i.e. mls) and a subZone (i.e. Western Conference) to just show that league
