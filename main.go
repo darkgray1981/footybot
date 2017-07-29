@@ -47,10 +47,11 @@ const BASE_LEAGUE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data
 // One %s param - team name
 const BASE_TEAM_TABLE_URL = "morph://data/bbc-morph-sport-football-table-team-model/team/%s/version/1.0.4"
 
+// BBC API rate limit measures
 var bbcRateLimit = 1
-
 var lastApiLookup = time.Now()
 
+// Generate a BBC API URL based on attempts made in the past 30 seconds
 func getBbcBaseUrl() string {
 	if time.Since(lastApiLookup) < 30 * time.Second {
 		bbcRateLimit += 1
@@ -63,6 +64,7 @@ func getBbcBaseUrl() string {
 	return fmt.Sprintf(BASE_BBC_URL, bbcRateLimit)
 }
 
+// Club aliases for ease of use
 var aliases = map[string]string{
 	"man city":      "manchester city",
 	"city":          "manchester city",
@@ -399,6 +401,7 @@ func TablePosition(team string) string {
 	return "Team table not found"
 }
 
+// Parser for the BBC API fixtures response
 func ParseBbcFixtures(team string) (*footballMatches, string) {
 	parsedResponse := &footballMatches{}
 
@@ -599,7 +602,7 @@ func NextMatch(team string) string {
 		if match.inProgress {
 			fixturesArr = append(fixturesArr, formatMatchResult(match))
 		} else {
-			var kickOffTime = match.kickOffTime.In(loc).Format("15:04 Aug 2")
+			var kickOffTime = match.kickOffTime.In(loc).Format("15:04 Jan 2")
 			var homeTeam = match.HomeTeam.Name.First
 			var awayTeam = match.AwayTeam.Name.First
 
@@ -662,6 +665,7 @@ func GetUKTime() string {
 	return time.Now().In(loc).Format("15:04:05 MST")
 }
 
+// Generate fixtures offset date in UK locale
 func getUKDate(offset int) string {
 	loc, err := time.LoadLocation("Europe/London")
 	if err != nil {
