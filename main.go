@@ -29,8 +29,8 @@ func main() {
 	runBot()
 }
 
-// Note - possibly rate limited
-const BASE_BBC_URL = "http://push.api.bbci.co.uk/p?c=1&t=";
+// One %d parameter - used to deal with the rate limit
+const BASE_BBC_URL = "http://push.api.bbci.co.uk/p?c=%d&t=";
 
 // One %s param - team name
 const BASE_TEAM_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-tabbed-teams-model/isApp/false/limit/4/team/%s/version/1.0.6"
@@ -42,14 +42,32 @@ const BASE_LEAGUE_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-t
 const BASE_FIXTURES_URL = "morph://data/bbc-morph-football-scores-match-list-data/endDate/%s/startDate/%s/tournament/%s/version/2.2.1/withPlayerActions/false"
 
 // One %s param - tournament
-const BASE_LEAGUE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.4.1"
+const BASE_LEAGUE_TABLE_URL = "morph://data/bbc-morph-sport-football-tables-data/competition/%s/version/1.5.0"
 
 // One %s param - team name
 const BASE_TEAM_TABLE_URL = "morph://data/bbc-morph-sport-football-table-team-model/team/%s/version/1.0.4"
 
+var bbcRateLimit = 1
+
+var lastApiLookup = int64(0)
+
+func getBbcBaseUrl() string {
+	if time.Now().Unix() - lastApiLookup < 30000 {
+		bbcRateLimit += 1
+	} else {
+		bbcRateLimit = 1
+	}
+
+	lastApiLookup = time.Now().Unix()
+
+	return fmt.Sprintf(BASE_BBC_URL, bbcRateLimit)
+}
+
 var aliases = map[string]string{
+	"man city":      "manchester city",
 	"city":          "manchester city",
 	"united":        "manchester united",
+	"man utd":       "manchester united",
 	"wolves":        "wolverhampton wanderers",
 	"wolverhampton": "wolverhampton wanderers",
 	"tottenham":     "tottenham hotspur",
@@ -330,7 +348,7 @@ func LatestResults(team string) string {
 func TablePosition(team string) string {
 	team = checkAlias(team)
 
-	var site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_TABLE_URL, team))
+	var site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_TABLE_URL, team))
 	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
@@ -350,7 +368,7 @@ func TablePosition(team string) string {
 	json.Unmarshal(body, &pushResponse)
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
 		fmt.Println(site + " " + string(body))
-		return "Error - failed to parse BBC JSON response"
+		return "No JSON table payload, team table not found"
 	}
 
 	leagueTable := teamLeagueTable{}
@@ -394,9 +412,9 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 
 	var site = ""
 	if isTournament {
-		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
+		site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
 	} else {
-		site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
+		site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
 	}
 
 	resp, err := http.Get(site)
@@ -419,7 +437,7 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 	json.Unmarshal(body, &pushResponse)
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
 		fmt.Println(site + " " + string(body))
-		return nil, "Error - failed to parse BBC JSON response"
+		return nil, "No JSON fixture payload, no fixtures found"
 	}
 
 	// Tournament & Team responses differ in wrapper structure
@@ -713,8 +731,8 @@ func ShowTable(args string) string {
 
 	if len(splitArgs) < 1 {
 		return "Error - No parameters"
-	} else if !strings.HasPrefix(args, "#") && tournaments[splitArgs[0]] == "" {
-		return TablePosition(splitArgs[0])
+	} else if !strings.HasPrefix(args, "#") && tournaments[strings.ToUpper(splitArgs[0])] == "" {
+		return TablePosition(args)
 	} else {
 		if strings.HasPrefix(splitArgs[0], "#") {
 			pos = splitArgs[0][1:]
@@ -760,7 +778,7 @@ func ShowTable(args string) string {
 		return "Error - Unknown zone"
 	}
 
-	var site = BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_TABLE_URL, tournaments[zone]))
+	var site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_TABLE_URL, tournaments[zone]))
 	resp, err := http.Get(site)
 	if err != nil {
 		return "Error - " + err.Error()
@@ -780,7 +798,7 @@ func ShowTable(args string) string {
 	json.Unmarshal(body, &pushResponse)
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
 		fmt.Println(site + " " + string(body))
-		return "Error - failed to parse BBC JSON response"
+		return "No JSON table payload, table not found"
 	}
 
 	table := leagueTable{}
@@ -840,7 +858,7 @@ func AllFixtures(zone, input string) string {
 
 	dateStr := getUKDate(wantedDate)
 
-	site := BASE_BBC_URL + url.QueryEscape(fmt.Sprintf(BASE_FIXTURES_URL, dateStr, dateStr, tournaments[zone]))
+	site := getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_FIXTURES_URL, dateStr, dateStr, tournaments[zone]))
 
 	resp, err := http.Get(site)
 	if err != nil {
@@ -862,7 +880,7 @@ func AllFixtures(zone, input string) string {
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
 		fmt.Println(site)
 		fmt.Println(string(body))
-		return "Error - failed to parse BBC JSON response"
+		return "No JSON fixtures payload, fixtures not found"
 	}
 
 	payload := fixtureList{}
