@@ -7,10 +7,10 @@ import (
 // BBC Response structs
 type bbcPushResponse struct {
 	Moments []struct {
-		Topic string `json:"topic"`
-		ID int `json:"id"`
-		Payload string `json:"payload"`
-		PayloadHash string `json:"payloadHash"`
+		Topic        string    `json:"topic"`
+		ID           int       `json:"id"`
+		Payload      string    `json:"payload"`
+		PayloadHash  string    `json:"payloadHash"`
 		LastModified time.Time `json:"lastModified"`
 	} `json:"moments"`
 	Meta struct {
@@ -19,49 +19,49 @@ type bbcPushResponse struct {
 }
 
 type team struct {
-	Key string `json:"key"`
-	Scores scores `json:"scores"`
-	EventOutcome interface{} `json:"eventOutcome"`
-	Name teamName `json:"name"`
-	Stats interface{} `json:"stats"`
-	Players []interface{} `json:"players"`
+	Key          string        `json:"key"`
+	Scores       scores        `json:"scores"`
+	EventOutcome interface{}   `json:"eventOutcome"`
+	Name         teamName      `json:"name"`
+	Stats        interface{}   `json:"stats"`
+	Players      []interface{} `json:"players"`
 }
 
 type teamName struct {
-	First string `json:"first"`
-	Full string `json:"full"`
-	Abbreviation string `json:"abbreviation"`
-	Last interface{} `json:"last"`
+	First        string      `json:"first"`
+	Full         string      `json:"full"`
+	Abbreviation string      `json:"abbreviation"`
+	Last         interface{} `json:"last"`
 }
 
 type scores struct {
-	Score int `json:"score"`
-	HalfTime int `json:"halfTime"`
-	FullTime int `json:"fullTime"`
-	ExtraTime interface{} `json:"extraTime"`
-	Shootout interface{} `json:"shootout"`
-	Aggregate interface{} `json:"aggregate"`
+	Score              int         `json:"score"`
+	HalfTime           int         `json:"halfTime"`
+	FullTime           int         `json:"fullTime"`
+	ExtraTime          interface{} `json:"extraTime"`
+	Shootout           interface{} `json:"shootout"`
+	Aggregate          interface{} `json:"aggregate"`
 	AggregateGoalsAway interface{} `json:"aggregateGoalsAway"`
 }
 
 type tournamentEvent struct {
-	EventKey string `json:"eventKey"`
-	StartTime time.Time `json:"startTime"`
-	StartTimeInUKHHMM string `json:"startTimeInUKHHMM"`
-	MinutesElapsed int `json:"minutesElapsed"`
-	MinutesIntoAddedTime int `json:"minutesIntoAddedTime"`
-	HomeTeam team `json:"homeTeam"`
-	AwayTeam team `json:"awayTeam"`
-	Comment interface{} `json:"comment"`
-	EventProgress struct {
+	EventKey             string      `json:"eventKey"`
+	StartTime            time.Time   `json:"startTime"`
+	StartTimeInUKHHMM    string      `json:"startTimeInUKHHMM"`
+	MinutesElapsed       int         `json:"minutesElapsed"`
+	MinutesIntoAddedTime int         `json:"minutesIntoAddedTime"`
+	HomeTeam             team        `json:"homeTeam"`
+	AwayTeam             team        `json:"awayTeam"`
+	Comment              interface{} `json:"comment"`
+	EventProgress        struct {
 		Period string `json:"period"`
 		Status string `json:"status"`
 	} `json:"eventProgress"`
-	Href interface{} `json:"href"`
+	Href                    interface{} `json:"href"`
 	TemporaryRoundReference struct {
 		Name struct {
-			First interface{} `json:"first"`
-			Full interface{} `json:"full"`
+			First        interface{} `json:"first"`
+			Full         interface{} `json:"full"`
 			Abbreviation interface{} `json:"abbreviation"`
 		} `json:"name"`
 		TempID int `json:"tempId"`
@@ -69,65 +69,65 @@ type tournamentEvent struct {
 }
 
 type teamEvent struct {
-	EventKey string `json:"eventKey"`
-	StartTime time.Time `json:"startTime"`
-	MinutesElapsed int `json:"minutesElapsed"`
+	EventKey             string      `json:"eventKey"`
+	StartTime            time.Time   `json:"startTime"`
+	MinutesElapsed       int         `json:"minutesElapsed"`
 	MinutesIntoAddedTime interface{} `json:"minutesIntoAddedTime"`
-	EventStatus string `json:"eventStatus"`
-	EventStatusNote string `json:"eventStatusNote"`
-	EventStatusReason interface{} `json:"eventStatusReason"`
-	EventOutcomeType interface{} `json:"eventOutcomeType"`
-	EventType string `json:"eventType"`
-	SeriesWinner interface{} `json:"seriesWinner"`
-	CpsID interface{} `json:"cpsId"`
-	CpsLive interface{} `json:"cpsLive"`
-	Attendance interface{} `json:"attendance"`
-	HomeTeam team `json:"homeTeam"`
-	AwayTeam team `json:"awayTeam"`
-	EventProgress struct {
+	EventStatus          string      `json:"eventStatus"`
+	EventStatusNote      string      `json:"eventStatusNote"`
+	EventStatusReason    interface{} `json:"eventStatusReason"`
+	EventOutcomeType     interface{} `json:"eventOutcomeType"`
+	EventType            string      `json:"eventType"`
+	SeriesWinner         interface{} `json:"seriesWinner"`
+	CpsID                interface{} `json:"cpsId"`
+	CpsLive              interface{} `json:"cpsLive"`
+	Attendance           interface{} `json:"attendance"`
+	HomeTeam             team        `json:"homeTeam"`
+	AwayTeam             team        `json:"awayTeam"`
+	EventProgress        struct {
 		Period string `json:"period"`
 		Status string `json:"status"`
 	} `json:"eventProgress"`
 	Players interface{} `json:"players"`
-	Venue struct {
+	Venue   struct {
 		Name struct {
 			Abbreviation string `json:"abbreviation"`
-			VideCode string `json:"videCode"`
-			First string `json:"first"`
-			Full string `json:"full"`
+			VideCode     string `json:"videCode"`
+			First        string `json:"first"`
+			Full         string `json:"full"`
 		} `json:"name"`
 		HomeCountry interface{} `json:"homeCountry"`
 	} `json:"venue"`
-	Officials []interface{} `json:"officials"`
-	TournamentInfo interface{} `json:"tournamentInfo"`
-	StartTimeInUKHHMM string `json:"startTimeInUKHHMM"`
-	Comment interface{} `json:"comment"`
-	Href interface{} `json:"href"`
-	TournamentName struct {
-		First string `json:"first"`
-		Full string `json:"full"`
+	Officials         []interface{} `json:"officials"`
+	TournamentInfo    interface{}   `json:"tournamentInfo"`
+	StartTimeInUKHHMM string        `json:"startTimeInUKHHMM"`
+	Comment           interface{}   `json:"comment"`
+	Href              interface{}   `json:"href"`
+	TournamentName    struct {
+		First        string `json:"first"`
+		Full         string `json:"full"`
 		Abbreviation string `json:"abbreviation"`
 	} `json:"tournamentName"`
 	TournamentSlug string `json:"tournamentSlug"`
-	DateString string `json:"dateString"`
+	DateString     string `json:"dateString"`
 }
 
 type tournamentMatch struct {
-	TotalEvents int `json:"totalEvents"`
-	Date string `json:"date"`
-	Tournament struct {
+	TotalEvents int    `json:"totalEvents"`
+	Date        string `json:"date"`
+	Tournament  struct {
 		Name struct {
-			First string `json:"first"`
-			Full string `json:"full"`
+			First        string `json:"first"`
+			Full         string `json:"full"`
 			Abbreviation string `json:"abbreviation"`
 		} `json:"name"`
-		Slug string `json:"slug"`
+		Slug   string `json:"slug"`
 		Stages []struct {
-			Name interface{} `json:"name"`
+			Name   interface{} `json:"name"`
 			Rounds []struct {
 				Name struct {
-					First interface{} `json:"first"`
-					Full interface{} `json:"full"`
+					First        interface{} `json:"first"`
+					Full         interface{} `json:"full"`
 					Abbreviation interface{} `json:"abbreviation"`
 				} `json:"name"`
 				Events []tournamentEvent `json:"events"`
@@ -137,16 +137,16 @@ type tournamentMatch struct {
 }
 
 type tournamentMatches struct {
-	Today tournamentMatch `json:"today"`
+	Today    tournamentMatch `json:"today"`
 	Fixtures tournamentMatch `json:"fixtures"`
-	Results tournamentMatch `json:"results"`
+	Results  tournamentMatch `json:"results"`
 }
 
 type teamMatch struct {
 	Meta struct {
-		ResponseCode int `json:"responseCode"`
+		ResponseCode int         `json:"responseCode"`
 		ErrorMessage interface{} `json:"errorMessage"`
-		Headers struct {
+		Headers      struct {
 			ContentType string `json:"content-type"`
 		} `json:"headers"`
 	} `json:"meta"`
@@ -157,15 +157,15 @@ type teamMatch struct {
 				Full         string `json:"full"`
 				Abbreviation string `json:"abbreviation"`
 			} `json:"name"`
-			Events []teamEvent  `json:"events"`
+			Events []teamEvent `json:"events"`
 		} `json:"rounds"`
 	} `json:"body"`
 }
 
 type teamMatches struct {
 	Fixtures teamMatch `json:"fixtures"`
-	Today teamMatch `json:"today"`
-	Results teamMatch `json:"results"`
+	Today    teamMatch `json:"today"`
+	Results  teamMatch `json:"results"`
 }
 
 type fixtureList struct {
@@ -176,8 +176,8 @@ type fixtureList struct {
 		TournamentMeta struct {
 			TournamentSlug string `json:"tournamentSlug"`
 			TournamentName struct {
-				First string `json:"first"`
-				Full string `json:"full"`
+				First        string `json:"first"`
+				Full         string `json:"full"`
 				Abbreviation string `json:"abbreviation"`
 			} `json:"tournamentName"`
 		} `json:"tournamentMeta"`
@@ -187,24 +187,24 @@ type fixtureList struct {
 
 type tournamentFixtures struct {
 	Round struct {
-		Key string `json:"key"`
+		Key  string `json:"key"`
 		Name struct {
-			First string `json:"first"`
-			Full string `json:"full"`
+			First        string `json:"first"`
+			Full         string `json:"full"`
 			Abbreviation string `json:"abbreviation"`
 		} `json:"name"`
 	} `json:"round"`
-	Events []teamEvent  `json:"events"`
+	Events []teamEvent `json:"events"`
 }
 
 type leagueTable struct {
 	SportTables struct {
-		Title string `json:"title"`
+		Title  string `json:"title"`
 		Tables []struct {
 			Group struct {
 				Name string `json:"name"`
 			} `json:"group"`
-			Live bool `json:"live"`
+			Live   bool `json:"live"`
 			Styles struct {
 			} `json:"styles"`
 			Headings []struct {
@@ -216,16 +216,16 @@ type leagueTable struct {
 			} `json:"headings"`
 			Rows []struct {
 				RowStyles string `json:"rowStyles"`
-				Cells []struct {
+				Cells     []struct {
 					Td struct {
-						Text int `json:"text"`
-						Abbr string `json:"abbr"`
-						Icon string `json:"icon"`
-						Styles string `json:"styles"`
+						Text     int    `json:"text"`
+						Abbr     string `json:"abbr"`
+						Icon     string `json:"icon"`
+						Styles   string `json:"styles"`
 						AbbrLink struct {
-							Link string `json:"link"`
-							Text string `json:"text"`
-							Abbr string `json:"abbr"`
+							Link       string `json:"link"`
+							Text       string `json:"text"`
+							Abbr       string `json:"abbr"`
 							AbbrStyles string `json:"abbrStyles"`
 						} `json:"abbrLink"`
 					} `json:"td"`
@@ -234,10 +234,10 @@ type leagueTable struct {
 			Footer []struct {
 				Cells []struct {
 					Td struct {
-						Colspan int `json:"colspan"`
-						Time time.Time `json:"time"`
-						Text string `json:"text"`
-						Styles string `json:"styles"`
+						Colspan int       `json:"colspan"`
+						Time    time.Time `json:"time"`
+						Text    string    `json:"text"`
+						Styles  string    `json:"styles"`
 					} `json:"td"`
 				} `json:"cells"`
 			} `json:"footer"`
@@ -249,45 +249,45 @@ type leagueTable struct {
 type teamLeagueTable []struct {
 	Tournament struct {
 		Name struct {
-			Full string `json:"full"`
-			First string `json:"first"`
+			Full         string `json:"full"`
+			First        string `json:"first"`
 			Abbreviation string `json:"abbreviation"`
-			VideCode string `json:"videCode"`
+			VideCode     string `json:"videCode"`
 		} `json:"name"`
 		Homepage string `json:"homepage"`
-		Slug string `json:"slug"`
+		Slug     string `json:"slug"`
 	} `json:"tournament"`
 	Tables []struct {
 		Round struct {
 			Meta struct {
-				RoundKey string `json:"roundKey"`
+				RoundKey     string `json:"roundKey"`
 				NamePriority string `json:"namePriority"`
 			} `json:"meta"`
 			Name interface{} `json:"name"`
 		} `json:"round"`
 		Teams []struct {
 			Name struct {
-				Full string `json:"full"`
-				First string `json:"first"`
+				Full         string `json:"full"`
+				First        string `json:"first"`
 				Abbreviation string `json:"abbreviation"`
-				VideCode string `json:"videCode"`
+				VideCode     string `json:"videCode"`
 			} `json:"name"`
-			Slug string `json:"slug"`
+			Slug     string `json:"slug"`
 			Homepage string `json:"homepage"`
-			Key string `json:"key"`
-			Stats struct {
-				Played int `json:"played"`
-				Won int `json:"won"`
-				Drawn int `json:"drawn"`
-				Lost int `json:"lost"`
-				GoalsFor int `json:"goalsFor"`
-				GoalsAgainst int `json:"goalsAgainst"`
+			Key      string `json:"key"`
+			Stats    struct {
+				Played         int `json:"played"`
+				Won            int `json:"won"`
+				Drawn          int `json:"drawn"`
+				Lost           int `json:"lost"`
+				GoalsFor       int `json:"goalsFor"`
+				GoalsAgainst   int `json:"goalsAgainst"`
 				GoalDifference int `json:"goalDifference"`
-				Points int `json:"points"`
+				Points         int `json:"points"`
 			} `json:"stats"`
 			Rank struct {
-				Current int `json:"current"`
-				Previous int `json:"previous"`
+				Current  int    `json:"current"`
+				Previous int    `json:"previous"`
 				Movement string `json:"movement"`
 			} `json:"rank"`
 		} `json:"teams"`
@@ -295,21 +295,20 @@ type teamLeagueTable []struct {
 	} `json:"tables"`
 }
 
-
 // Internal structs
 type footballMatch struct {
-	kickOffTime time.Time
-	isFixture bool
-	inProgress bool
-	isResult bool
+	kickOffTime      time.Time
+	isFixture        bool
+	inProgress       bool
+	isResult         bool
 	isTournamentGame bool
-	Tournament string
-	HomeTeam team
-	AwayTeam team
-	minutesElapsed int
+	Tournament       string
+	HomeTeam         team
+	AwayTeam         team
+	minutesElapsed   int
 }
 
 type footballMatches struct {
 	fixtures []footballMatch
-	results []footballMatch
+	results  []footballMatch
 }

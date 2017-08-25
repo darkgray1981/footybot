@@ -30,7 +30,7 @@ func main() {
 }
 
 // One %d parameter - used to deal with the rate limit
-const BASE_BBC_URL = "http://push.api.bbci.co.uk/p?c=%d&t=";
+const BASE_BBC_URL = "http://push.api.bbci.co.uk/p?c=%d&t="
 
 // One %s param - team name
 const BASE_TEAM_FIXTURES_URL = "morph://data/bbc-morph-sport-football-scores-tabbed-teams-model/isApp/false/limit/4/team/%s/version/1.0.6"
@@ -53,7 +53,7 @@ var lastApiLookup = time.Now()
 
 // Generate a BBC API URL based on attempts made in the past 30 seconds
 func getBbcBaseUrl() string {
-	if time.Since(lastApiLookup) < 30 * time.Second {
+	if time.Since(lastApiLookup) < 30*time.Second {
 		bbcRateLimit += 1
 	} else {
 		bbcRateLimit = 1
@@ -350,26 +350,38 @@ func LatestResults(team string) string {
 func TablePosition(team string) string {
 	team = checkAlias(team)
 
-	var site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_TABLE_URL, team))
-	resp, err := http.Get(site)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "Error - Table not found."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
 	pushResponse := bbcPushResponse{}
-	json.Unmarshal(body, &pushResponse)
+
+	// Try three times in case the API is fickle
+	for i := 0; i < 3; i++ {
+		site := getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_TABLE_URL, team))
+
+		resp, err := http.Get(site)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return "Error - Table not found."
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		err = json.Unmarshal(body, &pushResponse)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		if len(pushResponse.Moments) != 0 && len(pushResponse.Moments[0].Payload) != 0 {
+			break
+		}
+	}
+
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
-		fmt.Println(site + " " + string(body))
 		return "No JSON table payload, team table not found"
 	}
 
@@ -405,7 +417,7 @@ func TablePosition(team string) string {
 func ParseBbcFixtures(team string) (*footballMatches, string) {
 	parsedResponse := &footballMatches{}
 
-	var isTournament = false
+	isTournament := false
 	if tournament, ok := tournaments[strings.ToUpper(team)]; ok {
 		team = tournament
 		isTournament = true
@@ -413,33 +425,48 @@ func ParseBbcFixtures(team string) (*footballMatches, string) {
 		team = checkAlias(team)
 	}
 
-	var site = ""
-	if isTournament {
-		site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
-	} else {
-		site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
-	}
-
-	resp, err := http.Get(site)
-	if err != nil {
-		return nil, "Error - " + err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		fmt.Println("Club not found: " + team)
-		return nil, "Error - Club not found."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, "Error - " + err.Error()
-	}
-
+	var site string
 	pushResponse := bbcPushResponse{}
-	json.Unmarshal(body, &pushResponse)
+
+	// Try three times in case the API is fickle
+	for i := 0; i < 3; i++ {
+
+		if isTournament {
+			site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_FIXTURES_URL, team))
+		} else {
+			site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_TEAM_FIXTURES_URL, team))
+		}
+
+		resp, err := http.Get(site)
+		if err != nil {
+			return nil, "Error - " + err.Error()
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			fmt.Println("Club not found: " + team)
+			return nil, "Error - Club not found."
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, "Error - " + err.Error()
+		}
+
+		err = json.Unmarshal(body, &pushResponse)
+		if err != nil {
+			return nil, "Error - " + err.Error()
+		}
+
+		if len(pushResponse.Moments) != 0 && len(pushResponse.Moments[0].Payload) != 0 {
+			break
+		} else {
+			fmt.Println("ERROR, Failed to receive JSON payload. Trying again...")
+			time.Sleep(250 * time.Millisecond)
+		}
+	}
+
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
-		fmt.Println(site + " " + string(body))
 		return nil, "No JSON fixture payload, no fixtures found"
 	}
 
@@ -782,26 +809,39 @@ func ShowTable(args string) string {
 		return "Error - Unknown zone"
 	}
 
-	var site = getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_TABLE_URL, tournaments[zone]))
-	resp, err := http.Get(site)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "Error - Table not found."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
 	pushResponse := bbcPushResponse{}
-	json.Unmarshal(body, &pushResponse)
+
+	// Try three times in case the API is fickle
+	for i := 0; i < 3; i++ {
+		site := getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_LEAGUE_TABLE_URL, tournaments[zone]))
+
+		resp, err := http.Get(site)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return "Error - Table not found."
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		err = json.Unmarshal(body, &pushResponse)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		if len(pushResponse.Moments) != 0 && len(pushResponse.Moments[0].Payload) != 0 {
+			break
+		}
+
+	}
+
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
-		fmt.Println(site + " " + string(body))
 		return "No JSON table payload, table not found"
 	}
 
@@ -827,8 +867,8 @@ func ShowTable(args string) string {
 		}
 
 		for j := fromPos; j <= toPos; j++ {
-			var team = rows[j-1];
-			var teamName = team.Cells[2].Td.AbbrLink.Abbr;
+			var team = rows[j-1]
+			var teamName = team.Cells[2].Td.AbbrLink.Abbr
 			if teamName == "" {
 				teamName = team.Cells[2].Td.Abbr
 			}
@@ -862,28 +902,38 @@ func AllFixtures(zone, input string) string {
 
 	dateStr := getUKDate(wantedDate)
 
-	site := getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_FIXTURES_URL, dateStr, dateStr, tournaments[zone]))
-
-	resp, err := http.Get(site)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return "Error - Fixtures not found."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "Error - " + err.Error()
-	}
-
 	pushResponse := bbcPushResponse{}
-	json.Unmarshal(body, &pushResponse)
+
+	// Try three times in case the API is fickle
+	for i := 0; i < 3; i++ {
+		site := getBbcBaseUrl() + url.QueryEscape(fmt.Sprintf(BASE_FIXTURES_URL, dateStr, dateStr, tournaments[zone]))
+
+		resp, err := http.Get(site)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return "Error - Fixtures not found."
+		}
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		err = json.Unmarshal(body, &pushResponse)
+		if err != nil {
+			return "Error - " + err.Error()
+		}
+
+		if len(pushResponse.Moments) != 0 && len(pushResponse.Moments[0].Payload) != 0 {
+			break
+		}
+	}
+
 	if len(pushResponse.Moments) == 0 || len(pushResponse.Moments[0].Payload) == 0 {
-		fmt.Println(site)
-		fmt.Println(string(body))
 		return "No JSON fixtures payload, fixtures not found"
 	}
 
