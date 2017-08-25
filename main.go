@@ -904,6 +904,7 @@ func AllFixtures(zone, input string) string {
 					match.isFixture = daysGames[j].Events[k].EventProgress.Status == "FIXTURE"
 					match.inProgress = daysGames[j].Events[k].EventProgress.Status == "LIVE"
 					match.isResult = daysGames[j].Events[k].EventProgress.Status == "RESULT"
+					match.minutesElapsed = daysGames[j].Events[k].MinutesElapsed
 					fixtures = append(fixtures, match)
 				}
 			}
